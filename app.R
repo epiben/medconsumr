@@ -1,4 +1,4 @@
-# On a Mac, you should be able to invoke this app with
+# On a Mac this app can be invoked with this shell command
 # Rscript -e "shiny::runGitHub('medicinforbrug', 'epiben', launch.browser = TRUE)"
 
 # ==============================================================================
@@ -6,20 +6,6 @@
 # Install packages if no available
 pkgs <- c("shiny", "shinydashboard", "dplyr", "tidyr", "purrr", "readr",
           "stringr", "ggplot2", "lubridate")
-
-uninstalled <- sapply(pkgs, function(x) isFALSE(requireNamespace(x, quietly = TRUE)))
-
-if (any(uninstalled)) {
-  question <- paste(paste(pkgs[uninstalled], collapse = ", "), " not available. Install? [Y/n] ")
-  if (readline(question) == "Y") {
-    for (p in pkgs[uninstalled]) {
-      install.packages(p)
-    }
-  } else {
-    stop("App not started.")
-  }
-
-}
 
 for (p in pkgs) {
   if (isFALSE(requireNamespace(p, quietly = TRUE))) {
