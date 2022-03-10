@@ -20,40 +20,16 @@ Site3	Drug1	121.342	100.000	120.000	96.000	76.800	61.440	49.152
 Site4	Drug1	8.487.857	1.300.000	1.560.000	1.248.000	998.400	798.720	638.976	511.181	408.945	327.156	261.725	209.380	167.504	134.003
 Site5	Drug1	602.759	100.000	120.000	96.000	76.800	61.440	49.152	39.322	31.457					"
 
-# Functions
-parse_data <- function(data_as_string, delim = "\t", dec = ",", thousand = ".") {
-  # Warnings about parsing errors is fine; stems from empty columns
-  read_delim(data_as_string, col_names = FALSE, delim = delim, show_col_types = FALSE,
-             col_types = cols(.default = "c")) %>%
-    setNames(c("org_unit", "drug", .[1, -(1:2)])) %>%
-    slice(-(1:2)) %>%
-    select(-Total) %>%
-    fill(org_unit, .direction = "down") %>%
-    mutate(across(-c(org_unit, drug), parse_number,
-                  locale = locale(decimal_mark = dec, grouping_mark = thousand))) %>%
-    filter(drug != "Total")
-}
-
-wrangle_data <- function(df, period_type = "year", value_type = "amount") {
-  convert_period <- function(period_var) {
-    suffix <- switch(
-      period_type,
-      "year" = "-12-31",
-      ""
-    )
-    paste0(period_var, suffix)
-  }
-
-  df %>%
-    pivot_longer(-c(org_unit, drug), names_to = "period", values_to = value_type) %>%
-    mutate(period = parse_date(convert_period(period), "%Y-%m-%d"))
-}
-
 # Define UI for application that draws a histogram
 body <- dashboardBody(
   fluidRow(
-    box(title = "Enter data", collapsible = TRUE, width = 12,
+    box(title = "Enter data", collapsible = TRUE, width = 10,
         textAreaInput("raw_data", label = NULL, value = dummy_data, width = "100%", rows = 5)
+    ),
+    box(title = "Parsing settings", width = 2, collapsible = TRUE, collapsed = TRUE,
+        textInput("delim", "Column delimiter", value = "\t"),
+        textInput("thousand_marker", "Thousand marker", value = "."),
+        textInput("dec_marker", "Decimal marker", value = ",")
     )
   ),
 
@@ -75,7 +51,7 @@ body <- dashboardBody(
 
     ),
     box(title = "Appearance", collapse = FALSE, collapsible = TRUE, width = 4,
-      numericInput("text_size", "Text size", value = 16, min = 0.1, step = 1),
+      numericInput("text_size", "Text size", value = 16, min = 0, step = 1),
       numericInput("point_size", "Point size", value = 2, min = 0.1, step = 0.1),
       numericInput("line_size", "Line thickness", value = 1, min = 0.1, step = 0.1),
       numericInput("line_alpha", "Line transparency", value = 0.25, min = 0, max = 1, step = 0.1),
@@ -108,13 +84,36 @@ server <- function(input, output) {
   parsed_data <- reactive({
     if (input$raw_data == "") return(NULL)
 
-    parse_data(input$raw_data)
+    # Warnings about parsing errors is fine; stems from empty columns
+    read_delim(input$raw_data, col_names = FALSE, delim = input$delim, show_col_types = FALSE,
+               col_types = cols(.default = "c")) %>%
+      setNames(c("org_unit", "drug", .[1, -(1:2)])) %>%
+      slice(-(1:2)) %>%
+      select(-Total) %>%
+      fill(org_unit, .direction = "down") %>%
+      mutate(across(-c(org_unit, drug), parse_number,
+                    locale = locale(decimal_mark = input$dec_marker, grouping_mark = input$thousand_marker))) %>%
+      filter(drug != "Total")
   })
 
   wrangled_data <- reactive({
     if (input$raw_data == "") return(NULL)
 
-    wrangle_data(parsed_data())
+    period_type <- input$period_type %||% "year" # no input field so far
+    value_type <- input$value_type %||% "amount" # no input field so far
+
+    convert_period <- function(period_var) {
+      suffix <- switch(
+        period_type,
+        "year" = "-12-31",
+        ""
+      )
+      paste0(period_var, suffix)
+    }
+
+    parsed_data() %>%
+      pivot_longer(-c(org_unit, drug), names_to = "period", values_to = value_type) %>%
+      mutate(period = parse_date(convert_period(period), "%Y-%m-%d"))
   })
 
   drug_names_replacements <- reactive({
@@ -162,8 +161,8 @@ server <- function(input, output) {
                  drug = str_replace_all(drug, drug_names_replacements()))
 
     ggplot(df, aes(x = period, y = amount * input$y_scale, colour = org_unit)) +
-      geom_line(alpha = input$line_alpha, size = input$line_size) +
-      geom_point(size = input$point_size) +
+      geom_line(alpha = input$line_alpha, size = input$line_size, na.rm = TRUE) +
+      geom_point(size = input$point_size, na.rm = TRUE) +
       theme_minimal() +
       theme(legend.title = element_blank(),
             text = element_text(size = input$text_size)) +
