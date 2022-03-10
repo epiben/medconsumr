@@ -1,8 +1,25 @@
+# On a Mac, you should be able to invoke this app with
+# Rscript -e "shiny::runGitHub('medicinforbrug', 'epiben', launch.browser = TRUE)"
+
 # ==============================================================================
 
 # Install packages if no available
 pkgs <- c("shiny", "shinydashboard", "dplyr", "tidyr", "purrr", "readr",
           "stringr", "ggplot2", "lubridate")
+
+uninstalled <- sapply(pkgs, function(x) isFALSE(requireNamespace(x, quietly = TRUE)))
+
+if (any(uninstalled)) {
+  question <- paste(paste(pkgs[uninstalled], collapse = ", "), " not available. Install? [Y/n] ")
+  if (readline(question) == "Y") {
+    for (p in pkgs[uninstalled]) {
+      install.packages(p)
+    }
+  } else {
+    stop("App not started.")
+  }
+
+}
 
 for (p in pkgs) {
   if (isFALSE(requireNamespace(p, quietly = TRUE))) {
@@ -50,8 +67,9 @@ body <- dashboardBody(
   ),
 
   fluidRow(
-    box(title = "Custom labels", collapsed = FALSE, collapsible = TRUE, width = 4,
-      uiOutput("dynamic_drug_names")
+    box(title = "Custom content", collapsed = FALSE, collapsible = TRUE, width = 4,
+      uiOutput("dynamic_drug_names"),
+      uiOutput("dynamic_trial_span")
     ),
     box(title = "Scales and panels", collapsed = FALSE, collapsible = TRUE, width = 4,
       textInput("y_label", label = "Label, y axis", value = NULL),
@@ -157,6 +175,14 @@ server <- function(input, output) {
                 min = 1, max = n_drugs, step = 1)
   })
 
+  output$dynamic_trial_span <- renderUI({
+    max_value <- ymd(paste0(max(year(wrangled_data()$period)), "-12-31"))
+    sliderInput("trial_span", label = "Trial coverage", ticks = FALSE, step = 1,
+                value = c(max_value, max_value),
+                min = ymd(paste0(min(year(wrangled_data()$period)), "-01-01")),
+                max = max_value)
+  })
+
   # OUTPUT ELEMENTS
   output$parsed_data <- renderDataTable({
     parsed_data()
@@ -173,6 +199,8 @@ server <- function(input, output) {
                  drug = str_replace_all(drug, drug_names_replacements()))
 
     ggplot(df, aes(x = period, y = amount * input$y_scale, colour = org_unit)) +
+      annotate("rect", ymin = -Inf, ymax = Inf, xmin = input$trial_span[1],
+               xmax = input$trial_span[2], alpha = 0.1) +
       geom_line(alpha = input$line_alpha, size = input$line_size, na.rm = TRUE) +
       geom_point(size = input$point_size, na.rm = TRUE) +
       theme_minimal() +
