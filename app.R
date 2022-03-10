@@ -7,7 +7,7 @@ pkgs <- c("shiny", "shinydashboard", "dplyr", "tidyr", "purrr", "readr",
 for (p in pkgs) {
   if (isFALSE(requireNamespace(p, quietly = TRUE))) {
     message(p, " not available, now installing it.")
-    install.packages(p, repos = "https://mirrors.dotsrc.org/cran/") # Danish mirror
+    install.packages(p, type = "binary", repos = "https://cran.rstudio.com/")
   }
 }
 
