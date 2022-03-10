@@ -3,7 +3,8 @@ pkgs <- c("shiny", "shinydashboard", "dplyr", "tidyr", "purrr", "readr",
 
 for (p in pkgs) {
   if (isFALSE(requireNamespace(p, quietly = TRUE))) {
-    message(p, " not available, now installing")
+    chooseCRANmirror(graphics = FALSE, ind = 29) # Danish mirror
+    message(p, " not available, now installing it.")
     install.packages(p)
   }
 }
