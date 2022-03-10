@@ -1,12 +1,16 @@
-library(shiny)
-library(shinydashboard)
-library(dplyr)
-library(tidyr)
-library(purrr)
-library(readr)
-library(stringr)
-library(ggplot2)
-library(lubridate)
+pkgs <- c("shiny", "shinydashboard", "dplyr", "tidyr", "purrr", "readr",
+          "stringr", "ggplot2", "lubridate")
+
+for (p in pkgs) {
+  if (isFALSE(requireNamespace(p, quietly = TRUE))) {
+    message(p, " not available, now installing")
+    install.packages(p)
+  }
+}
+
+for (p in pkgs) {
+  library(p, character = TRUE)
+}
 
 dummy_data <- "		Total	2007	2008	2009	2010	2011	2012	2013	2014	2015	2016	2017	2018	2019
 Total	Total	36.236.573	5.126.129	6.241.894	6.304.735	6.253.449	5.521.455	3.576.395	1.301.713	517.134	539.275	328.389	274.743	133.215	118.047
