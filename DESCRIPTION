@@ -2,10 +2,20 @@ Package: medconsumr
 Title: Visualise usage metrics of drugs
 Version: 0.0.0.9000
 Authors@R: 
-    person("Benjamin Skov", "Kaas-Hansen", email = "epiben@hey.com", role = "aut", 
+    person("Benjamin Skov", "Kaas-Hansen", email = "epiben@hey.com", role = c("aut", "cre"), 
     	   comment = c(ORCID = "0000-0003-1023-0371"))
 Description: Allows for nice visuals based on standardised output data on medicines usage.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.1.2
+Depends:
+	shiny, 
+	shinydashboard, 
+	dplyr, 
+	tidyr, 
+	purrr, 
+	readr,
+	stringr, 
+	ggplot2, 
+	lubridate
