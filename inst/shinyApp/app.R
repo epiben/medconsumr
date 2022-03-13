@@ -1,6 +1,11 @@
 # On a Mac this app can be invoked with this shell command
 # Rscript -e "shiny::runGitHub('medicinforbrug', 'epiben', launch.browser = TRUE)"
 
+# To share on LAN, run the following (port is arbitrary but shouldn't be otherwise used)
+# runApp(host = "0.0.0.0", port = 4131)
+# Then others on the same LAN can access the app via (if the following is your computer's IP)
+# 192.168.1.6:4131
+
 # ==============================================================================
 
 # Install packages if no available
@@ -73,7 +78,7 @@ server <- function(input, output) {
 
   # REACTIVE DATA ELEMENTS ====
   parsed_data <- reactive({
-    if (is.null(input$excel_data$datapath)) return(NULL)
+  	req(input$excel_data, input$sheet, input$skip)
 
     d <- read_excel(input$excel_data$datapath, col_names = FALSE, sheet = input$sheet,
                     skip = round(input$skip), .name_repair = ~ paste0("X", seq_along(.)))
@@ -93,7 +98,7 @@ server <- function(input, output) {
   })
 
   wrangled_data <- reactive({
-    if (is.null(input$excel_data$datapath)) return(NULL)
+    req(parsed_data())
 
     period_type <- input$period_type %||% "year" # no input field so far
     value_type <- input$value_type %||% "amount" # no input field so far
@@ -113,7 +118,7 @@ server <- function(input, output) {
   })
 
   drug_names_replacements <- reactive({
-    if (is.null(input$excel_data$datapath)) return(NULL)
+  	req(parsed_data())
 
     drug_names <- list()
     for (n in names(input)) {
@@ -125,7 +130,7 @@ server <- function(input, output) {
 
   # REACTIVE INPUT FIELDS ====
   output$dynamic_drug_names <- renderUI({
-    if (is.null(input$excel_data$datapath)) return(NULL)
+  	req(parsed_data())
 
     map(
       unique(parsed_data()$drug),
@@ -134,48 +139,52 @@ server <- function(input, output) {
   })
 
   output$dynamic_n_cols <- renderUI({
-    if (is.null(input$excel_data$datapath)) return(NULL)
+  	req(parsed_data())
 
     n_drugs <- n_distinct(parsed_data()$drug)
     numericInput("n_cols", label = "Number of panel columns", value = min(2, n_drugs),
                  min = 1, max = n_drugs, step = 1)
   })
 
-  output$dynamic_trial_span <- renderUI({
-    if (is.null(input$excel_data$datapath)) return(NULL)
-
-    max_value <- ymd(paste0(max(year(wrangled_data()$period)), "-12-31"))
-    sliderInput("trial_span", label = "Trial coverage", ticks = FALSE, step = 1,
-                value = c(max_value, max_value),
-                min = ymd(paste0(min(year(wrangled_data()$period)), "-01-01")),
-                max = max_value)
-  })
-
   output$dynamic_sheet <- renderUI({
-    if (is.null(input$excel_data$datapath)) {
-      selectInput("sheet", "Sheet", choices = list("Choose file first"), width = "100%")
-    } else {
-      selectInput("sheet", "Sheet", choices = as.list(excel_sheets(input$excel_data$datapath)),
-                  width = "100%")
-    }
+  	req(input$excel_data)
+
+  	choices <- "Upload file first"
+  	try(choices <- excel_sheets(input$excel_data$datapath), silent = TRUE)
+  	selectInput("sheet", "Sheet", choices = as.list(choices), width = "100%")
   })
 
   output$dynamic_y_label <- renderUI({
-    if (is.null(input$excel_data$datapath)) return(NULL)
+    req(input$sheet)
 
     textInput("y_label", label = "Label, y axis", value = input$sheet)
   })
 
+  output$dynamic_trial_span <- renderUI({
+  	req(wrangled_data())
+
+  	max_value <- ymd(paste0(max(year(wrangled_data()$period)), "-12-31"))
+  	dateRangeInput("trial_span", label = NULL, start = max_value,
+  				   end = max_value, weekstart = 1)
+  })
+
+
   # REACTIVE BOXES ====
   output$dynamic_box_content <- renderUI({
-    box(title = "Custom content", collapsed = is.null(input$excel_data$datapath),
+  	req(input$excel_data)
+
+    box(title = "Customise content", collapsed = is.null(input$excel_data$datapath),
         collapsible = TRUE, width = 4,
-        uiOutput("dynamic_drug_names"),
-        uiOutput("dynamic_trial_span")
+    	h4("Trial start and end"),
+    	uiOutput("dynamic_trial_span"),
+    	h4("Rename drug names"),
+        uiOutput("dynamic_drug_names")
     )
   })
 
   output$dynamic_box_scales_panels <- renderUI({
+  	req(input$excel_data)
+
     box(title = "Scales and panels", collapsed = is.null(input$excel_data$datapath),
         collapsible = TRUE, width = 4,
         uiOutput("dynamic_y_label"),
@@ -188,6 +197,8 @@ server <- function(input, output) {
   })
 
   output$dynamic_box_appearance <- renderUI({
+  	req(input$excel_data)
+
     box(title = "Appearance", collapsed = is.null(input$excel_data$datapath),
         collapsible = TRUE, width = 4,
         numericInput("text_size", "Text size", value = 14, min = 0, step = 1),
@@ -200,37 +211,40 @@ server <- function(input, output) {
 
   # OUTPUT ELEMENTS ====
   output$parsed_data <- renderDataTable({
+  	req(parsed_data())
     parsed_data()
   }, options = list(scrollX = TRUE))
 
   output$wrangled_data <- renderDataTable({
+  	req(wrangled_data())
     wrangled_data()
   }, options = list(scrollX = TRUE))
 
   output$history_plot <- renderPlot({
-    if (is.null(input$excel_data$datapath))
-      return(ggplot() +
-               geom_text(aes(label = "Please, upload data", x = 0, y = 0), size = input$text_size/.pt) +
-               theme_void())
+  	req(input$excel_data, input$y_scale, input$trial_span, input$line_alpha,
+  		input$point_size, input$line_size, input$text_size, input$wrap_scales,
+  		input$n_cols, input$plot_height)
 
     df <- mutate(wrangled_data(),
                  drug = str_replace_all(drug, drug_names_replacements()))
 
     ggplot(df, aes(x = period, y = amount * input$y_scale, colour = org_unit)) +
-      annotate("rect", ymin = -Inf, ymax = Inf, xmin = input$trial_span[1],
-               xmax = input$trial_span[2], alpha = 0.1) +
-      geom_line(alpha = input$line_alpha, size = input$line_size, na.rm = TRUE) +
-      geom_point(size = input$point_size, na.rm = TRUE) +
-      theme_minimal() +
-      theme(legend.title = element_blank(),
-            text = element_text(size = input$text_size)) +
-      scale_y_continuous(labels = scales::label_number()) +
-      labs(x = input$x_label,
-           y = input$y_label) +
-      facet_wrap(~ drug, scales = input$wrap_scales, ncol = round(input$n_cols))
+    	annotate("rect", ymin = -Inf, ymax = Inf, xmin = input$trial_span[1],
+    				  xmax = input$trial_span[2], alpha = 0.1) +
+    	geom_line(alpha = input$line_alpha, size = input$line_size, na.rm = TRUE) +
+    	geom_point(size = input$point_size, na.rm = TRUE) +
+    	theme_minimal() +
+    	theme(legend.title = element_blank(),
+    		  text = element_text(size = input$text_size)) +
+    	scale_y_continuous(labels = scales::label_number()) +
+    	labs(x = input$x_label,
+    		 y = input$y_label) +
+    	facet_wrap(~ drug, scales = input$wrap_scales, ncol = round(input$n_cols))
   }, height = function() if (is.null(input$excel_data$datapath)) 30 else input$plot_height)
 
   output$box_with_plot <- renderUI({
+  	req(input$excel_data, input$plot_height)
+
     height <- if (is.null(input$excel_data$datapath)) 30 else input$plot_height
     box(plotOutput("history_plot"), width = 12, height = height + 40)
   })
