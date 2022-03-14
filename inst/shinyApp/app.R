@@ -1,25 +1,3 @@
-# On a Mac this app can be invoked with this shell command
-# Rscript -e "shiny::runGitHub('medicinforbrug', 'epiben', launch.browser = TRUE)"
-
-# To share on LAN, run the following (port is arbitrary but shouldn't be otherwise used)
-# runApp(host = "0.0.0.0", port = 4131)
-# Then others on the same LAN can access the app via (if the following is your computer's IP)
-# 192.168.1.6:4131
-
-# ==============================================================================
-
-# Install packages if no available
-pkgs <- c("shiny", "shinydashboard", "dplyr", "tidyr", "purrr", "readr",
-          "stringr", "ggplot2", "lubridate")
-
-for (p in pkgs) {
-  if (isFALSE(requireNamespace(p, quietly = TRUE))) {
-    message(p, " not available, now installing it.")
-    install.packages(p, type = "binary", repos = "https://cran.rstudio.com/")
-  }
-}
-
-# Must be done this way for shinyapps.io deployment to work
 library(shiny)
 library(shinydashboard)
 library(dplyr)
