@@ -24,6 +24,6 @@ launch_app <- function(object, rstudio = TRUE, ...) {
 	# .pkg_env$.RESULTS <- results
 	# on.exit(rm(.RESULTS, pos = .pkg_env), add = TRUE, after = TRUE) # only needed while running shiny app
 
-	shiny::runApp(system.file("shinyApp", package = "medconsumr"),
+	shiny::runApp(system.file("shiny", package = "medconsumr"),
 				  launch.browser = launchBrowser, ...)
 }
